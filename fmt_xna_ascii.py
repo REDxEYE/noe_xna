@@ -39,7 +39,7 @@ def list_to_bytes(data_list, fmt):
 
 
 def load_model(data, mdl_list):
-    data = data.decode('utf-8').split('\n')
+    data = [line.strip('\n\r') for line in data.decode('utf-8').split('\n') if line]
     fpath = rapi.getInputName()
     fname, root = os.path.basename(fpath), os.path.dirname(fpath)
     skel_path = os.path.join(root, fname[:-6] + '_skel.ascii')
@@ -54,19 +54,42 @@ def load_model(data, mdl_list):
     model = parse_ascii_mesh(data, extenal_skeleton is not None)
     rapi.rpgSetOption(noesis.RPGOPT_TRIWINDBACKWARD, 1)
 
-    materials = []
+    materials = {}
     textures = []
+    specular_texture = NoeTexture('default_spec', 1, 1, b'\x80\x80\x80\x80')
+    textures.append(specular_texture)
     for mesh in model.meshes:
         material = mesh.material
         mat_name = material.name
         if mat_name in materials:
             continue
-        noe_mat = NoeMaterial(mat_name, material.textures[0][0])
-        for tex in material.textures:
-            noe_tex = NoeTexture(tex[0], 0, 0, b'')
+        noe_mat = NoeMaterial(mat_name, '')
+        noe_mat.flags |= noesis.NMATFLAG_PBR_SPEC
+        noe_mat.setFlags2(noe_mat.flags2 | noesis.NMATFLAG2_PREFERPPL)
+        noe_mat.setRoughness(0.5, -0.3)
+        noe_mat.setSpecularTexture('default_spec')
+        noe_mat.setNormalTexture(noesis.getScenesPath() + "sample_pbr_n.png")
+        noe_mat.setEnvTexture(noesis.getScenesPath() + "sample_pbr_e4.dds")
+        has_diffuse = False
+        for i, texture in enumerate(material.textures):
+            texture_name = os.path.splitext(texture[0])[0]
+            noe_tex = rapi.loadExternalTex(texture_name)
+            if noe_tex is None:
+                continue
+            if i == 0:
+                has_diffuse = True
+                print("Diffuse ", texture_name)
+                noe_mat.setTexture(texture_name)
+            elif i == 1:
+                print("Normal ", texture_name)
+                noe_mat.setNormalTexture(texture_name)
+            elif i == 2:
+                print("Spec ", texture_name)
+                noe_mat.setSpecularTexture(texture_name)
             textures.append(noe_tex)
-        noe_mat.setDiffuseColor([random.uniform(.4, 1) for _ in range(3)] + [1.0])
-        materials.append(noe_mat)
+        if not has_diffuse:
+            noe_mat.setDiffuseColor([random.uniform(.4, 1) for _ in range(3)] + [1.0])
+        materials[mat_name] = noe_mat
     for mesh in model.meshes:
         print('Loading %s mesh...' % mesh.name)
         rapi.rpgSetName(mesh.name)
@@ -110,6 +133,6 @@ def load_model(data, mdl_list):
         noe_bone = NoeBone(bone_id, bone.name, noe_mat, model_bones[bone.parent_id].name, bone.parent_id)
         bones.append(noe_bone)
     mdl.setBones(bones)
-    mdl.setModelMaterials(NoeModelMaterials(textures, materials))
+    mdl.setModelMaterials(NoeModelMaterials(textures, list(materials.values())))
     mdl_list.append(mdl)
     return 1
