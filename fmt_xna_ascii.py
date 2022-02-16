@@ -74,8 +74,9 @@ def load_model(data, mdl_list):
         rapi.rpgBindPositionBuffer(list_to_bytes(mesh.vertices, '3f'), noesis.RPGEODATA_FLOAT, 12)
         rapi.rpgBindNormalBuffer(list_to_bytes(mesh.normals, '3f'), noesis.RPGEODATA_FLOAT, 12)
         # rapi.rpgBindColorBuffer(list_to_bytes(mesh.vertex_colors, '4f'), noesis.RPGEODATA_FLOAT, 16, 4)
-        rapi.rpgBindBoneIndexBuffer(list_to_bytes(mesh.bone_ids, '4I'), noesis.RPGEODATA_FLOAT, 16, 4)
-        rapi.rpgBindBoneWeightBuffer(list_to_bytes(mesh.weights, '4f'), noesis.RPGEODATA_FLOAT, 16, 4)
+        if mesh.bone_ids:
+            rapi.rpgBindBoneIndexBuffer(list_to_bytes(mesh.bone_ids, '4I'), noesis.RPGEODATA_FLOAT, 16, 4)
+            rapi.rpgBindBoneWeightBuffer(list_to_bytes(mesh.weights, '4f'), noesis.RPGEODATA_FLOAT, 16, 4)
 
         for uv_layer_id, uv_data in mesh.uv_layers.items():
             if uv_layer_id == 0:
