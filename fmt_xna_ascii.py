@@ -1,3 +1,4 @@
+import random
 import struct
 import os
 
@@ -53,6 +54,19 @@ def load_model(data, mdl_list):
     model = parse_ascii_mesh(data, extenal_skeleton is not None)
     rapi.rpgSetOption(noesis.RPGOPT_TRIWINDBACKWARD, 1)
 
+    materials = []
+    textures = []
+    for mesh in model.meshes:
+        material = mesh.material
+        mat_name = material.name
+        if mat_name in materials:
+            continue
+        noe_mat = NoeMaterial(mat_name, material.textures[0][0])
+        for tex in material.textures:
+            noe_tex = NoeTexture(tex[0], 0, 0, b'')
+            textures.append(noe_tex)
+        noe_mat.setDiffuseColor([random.uniform(.4, 1) for _ in range(3)] + [1.0])
+        materials.append(noe_mat)
     for mesh in model.meshes:
         rapi.rpgSetName(mesh.name)
         rapi.rpgSetMaterial(mesh.material.name)
@@ -86,5 +100,6 @@ def load_model(data, mdl_list):
         noe_bone = NoeBone(bone_id, bone.name, noe_mat, model_bones[bone.parent_id].name, bone.parent_id)
         bones.append(noe_bone)
     mdl.setBones(bones)
+    mdl.setModelMaterials(NoeModelMaterials(textures, materials))
     mdl_list.append(mdl)
     return 1
