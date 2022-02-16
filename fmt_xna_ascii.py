@@ -68,6 +68,7 @@ def load_model(data, mdl_list):
         noe_mat.setDiffuseColor([random.uniform(.4, 1) for _ in range(3)] + [1.0])
         materials.append(noe_mat)
     for mesh in model.meshes:
+        print('Loading %s mesh...' % mesh.name)
         rapi.rpgSetName(mesh.name)
         rapi.rpgSetMaterial(mesh.material.name)
 
@@ -75,8 +76,11 @@ def load_model(data, mdl_list):
         rapi.rpgBindNormalBuffer(list_to_bytes(mesh.normals, '3f'), noesis.RPGEODATA_FLOAT, 12)
         # rapi.rpgBindColorBuffer(list_to_bytes(mesh.vertex_colors, '4f'), noesis.RPGEODATA_FLOAT, 16, 4)
         if mesh.bone_ids:
-            rapi.rpgBindBoneIndexBuffer(list_to_bytes(mesh.bone_ids, '4I'), noesis.RPGEODATA_INT, 16, 4)
-            rapi.rpgBindBoneWeightBuffer(list_to_bytes(mesh.weights, '4f'), noesis.RPGEODATA_FLOAT, 16, 4)
+            bone_per_vertex = len(mesh.bone_ids[0])
+            rapi.rpgBindBoneIndexBuffer(list_to_bytes(mesh.bone_ids, '%iI' % bone_per_vertex), noesis.RPGEODATA_INT, 16,
+                                        bone_per_vertex)
+            rapi.rpgBindBoneWeightBuffer(list_to_bytes(mesh.weights, '%if' % bone_per_vertex), noesis.RPGEODATA_FLOAT,
+                                         16, bone_per_vertex)
 
         for uv_layer_id, uv_data in mesh.uv_layers.items():
             if uv_layer_id == 0:
@@ -98,7 +102,10 @@ def load_model(data, mdl_list):
     else:
         model_bones = model.bones
     for bone_id, bone in enumerate(model_bones):
-        noe_mat = NoeQuat(bone.quat).toMat43(1)
+        if bone.quat:
+            noe_mat = NoeQuat(bone.quat).toMat43(1)
+        else:
+            noe_mat = NoeMat43()
         noe_mat[3] = NoeVec3(bone.pos)
         noe_bone = NoeBone(bone_id, bone.name, noe_mat, model_bones[bone.parent_id].name, bone.parent_id)
         bones.append(noe_bone)
