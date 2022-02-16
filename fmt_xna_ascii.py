@@ -1,11 +1,13 @@
+import struct
+import os
+
 from inc_noesis import *
 import rapi
 import noesis
-import struct
 
 noesis.logPopup()
 
-from py_xna_lib import parse_ascii_mesh
+from py_xna_lib import parse_ascii_mesh, parse_ascii_mesh_from_file
 
 
 def registerNoesisTypes():
@@ -15,6 +17,7 @@ def registerNoesisTypes():
     # noesis.setHandlerWriteModel(handle, noepyWriteModel)
     # noesis.setHandlerWriteAnim(handle, noepyWriteAnim)
     noesis.setTypeSharedModelFlags(handle, noesis.NMSHAREDFL_FLATWEIGHTS)
+    noesis.setTypeSharedModelFlags(handle, noesis.NMSHAREDFL_WANTNEIGHBORS)
 
     return 1
 
@@ -36,11 +39,18 @@ def list_to_bytes(data_list, fmt):
 
 def load_model(data, mdl_list):
     data = data.decode('utf-8').split('\n')
+    fpath = rapi.getInputName()
+    fname, root = os.path.basename(fpath), os.path.dirname(fpath)
+    skel_path = os.path.join(root, fname[:-6] + '_skel.ascii')
+    if os.path.exists(skel_path):
+        extenal_skeleton = parse_ascii_mesh_from_file(skel_path)
+    else:
+        extenal_skeleton = None
     if len(data) < 10:
         print('File is too short')
         return 0
     ctx = rapi.rpgCreateContext()
-    model = parse_ascii_mesh(data)
+    model = parse_ascii_mesh(data, extenal_skeleton is not None)
     rapi.rpgSetOption(noesis.RPGOPT_TRIWINDBACKWARD, 1)
 
     for mesh in model.meshes:
@@ -66,10 +76,14 @@ def load_model(data, mdl_list):
 
     mdl = rapi.rpgConstructModel()
     bones = []
-    for bone_id, bone in enumerate(model.bones):
+    if extenal_skeleton is not None:
+        model_bones = extenal_skeleton.bones
+    else:
+        model_bones = model.bones
+    for bone_id, bone in enumerate(model_bones):
         noe_mat = NoeQuat(bone.quat).toMat43(1)
         noe_mat[3] = NoeVec3(bone.pos)
-        noe_bone = NoeBone(bone_id, bone.name, noe_mat, model.bones[bone.parent_id].name, bone.parent_id)
+        noe_bone = NoeBone(bone_id, bone.name, noe_mat, model_bones[bone.parent_id].name, bone.parent_id)
         bones.append(noe_bone)
     mdl.setBones(bones)
     mdl_list.append(mdl)
