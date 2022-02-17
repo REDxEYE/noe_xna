@@ -1,6 +1,7 @@
 import random
 import struct
 import array
+import time
 
 from inc_noesis import *
 import rapi
@@ -31,14 +32,32 @@ def check_type(data):
     return 1
 
 
-def list_to_bytes(data_list, fmt):
-    ar = array.array(fmt, [])
-    for item in data_list:
-        ar.extend(item)
-    return ar.tobytes()
+def list_to_type(data_list, type_):
+    return [type_(i) for i in data_list]
+
+
+def flatten(data_list):
+    new_list = []
+    [new_list.extend(i) for i in data_list]
+    return new_list
+
+
+def flip_sub_elements(data_list):
+    for i in range(len(data_list)):
+        data_list[i] = data_list[i][::-1]
+    return data_list
+
+
+def fill_up_to(data_list, elen, filler=1.0):
+    for i in range(len(data_list)):
+        len1 = len(data_list[i])
+        if len1 < elen:
+            data_list[i] = tuple(data_list[i]) + tuple([filler] * (elen - len1))
+    return data_list
 
 
 def load_model(data, mdl_list):
+    start_time = time.time()
     data = [line.strip('\n\r') for line in data.decode('utf-8').split('\n') if line]
     fpath = rapi.getInputName()
     fname, root = os.path.basename(fpath), os.path.dirname(fpath)
@@ -52,7 +71,6 @@ def load_model(data, mdl_list):
         return 0
     ctx = rapi.rpgCreateContext()
     model = parse_ascii_mesh(data, extenal_skeleton is not None)
-    rapi.rpgSetOption(noesis.RPGOPT_TRIWINDBACKWARD, 1)
 
     materials = {}
     textures = []
@@ -66,6 +84,7 @@ def load_model(data, mdl_list):
         noe_mat = NoeMaterial(mat_name, '')
         noe_mat.flags |= noesis.NMATFLAG_PBR_SPEC
         noe_mat.setFlags2(noe_mat.flags2 | noesis.NMATFLAG2_PREFERPPL)
+        noe_mat.setFlags2(noe_mat.flags2 | noesis.NMATFLAG2_VCOLORMATDIFFUSE)
         noe_mat.setRoughness(0.5, -0.3)
         noe_mat.setSpecularTexture('default_spec')
         noe_mat.setNormalTexture(noesis.getScenesPath() + "sample_pbr_n.png")
@@ -90,35 +109,23 @@ def load_model(data, mdl_list):
         if not has_diffuse:
             noe_mat.setDiffuseColor([random.uniform(.4, 1) for _ in range(3)] + [1.0])
         materials[mat_name] = noe_mat
+    noe_meshes = []
     for mesh in model.meshes:
         print('Loading %s mesh...' % mesh.name)
-        rapi.rpgSetName(mesh.name)
-        rapi.rpgSetMaterial(mesh.material.name)
 
-        rapi.rpgBindPositionBuffer(list_to_bytes(mesh.vertices, 'f'), noesis.RPGEODATA_FLOAT, 12)
-        rapi.rpgBindNormalBuffer(list_to_bytes(mesh.normals, 'f'), noesis.RPGEODATA_FLOAT, 12)
-        # rapi.rpgBindColorBuffer(list_to_bytes(mesh.vertex_colors, '4f'), noesis.RPGEODATA_FLOAT, 16, 4)
-        if mesh.bone_ids:
-            bone_per_vertex = len(mesh.bone_ids[0])
-            rapi.rpgBindBoneIndexBuffer(list_to_bytes(mesh.bone_ids, 'I'), noesis.RPGEODATA_INT, 16,
-                                        bone_per_vertex)
-            rapi.rpgBindBoneWeightBuffer(list_to_bytes(mesh.weights, 'f'), noesis.RPGEODATA_FLOAT,
-                                         16, bone_per_vertex)
-
+        noe_mesh = NoeMesh(flatten(flip_sub_elements(mesh.indices)), list_to_type(mesh.vertices, NoeVec3),
+                           mesh.material.name)
+        noe_mesh.setMaterial(mesh.material.name)
+        noe_mesh.setNormals(list_to_type(mesh.normals, NoeVec3))
+        noe_mesh.setColors(list_to_type(mesh.vertex_colors, NoeVec4))
         for uv_layer_id, uv_data in mesh.uv_layers.items():
-            if uv_layer_id == 0:
-                rapi.rpgBindUV1Buffer(list_to_bytes(uv_data, 'f'), noesis.RPGEODATA_FLOAT, 8)
-            else:
-                rapi.rpgBindUVXBuffer(list_to_bytes(uv_data, 'f'), noesis.RPGEODATA_FLOAT, 8, uv_layer_id,
-                                      len(uv_data) * 2)
+            noe_mesh.setUVs(list_to_type(fill_up_to(uv_data, 3, 0), NoeVec3), uv_layer_id + uv_layer_id != 0)
+        if mesh.bone_ids:
+            weights = [NoeVertWeight(bone_ids, bone_weights)
+                       for bone_ids, bone_weights in zip(mesh.bone_ids, mesh.weights)]
+            noe_mesh.setWeights(weights)
+        noe_meshes.append(noe_mesh)
 
-        rapi.rpgCommitTriangles(list_to_bytes(mesh.indices, 'I'), noesis.RPGEODATA_INT, len(mesh.indices) * 3,
-                                noesis.RPGEO_TRIANGLE, 1)
-
-        rapi.rpgClearBufferBinds()
-        rapi.rpgOptimize()
-
-    mdl = rapi.rpgConstructModel()
     bones = []
     if extenal_skeleton is not None:
         model_bones = extenal_skeleton.bones
@@ -132,7 +139,9 @@ def load_model(data, mdl_list):
         noe_mat[3] = NoeVec3(bone.pos)
         noe_bone = NoeBone(bone_id, bone.name, noe_mat, model_bones[bone.parent_id].name, bone.parent_id)
         bones.append(noe_bone)
-    mdl.setBones(bones)
+    mdl = NoeModel(noe_meshes, bones)
     mdl.setModelMaterials(NoeModelMaterials(textures, list(materials.values())))
+
     mdl_list.append(mdl)
+    print("Import took %.2f seconds" % (time.time() - start_time))
     return 1
