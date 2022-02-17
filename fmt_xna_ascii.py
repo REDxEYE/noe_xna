@@ -1,6 +1,6 @@
 import random
 import struct
-import os
+import array
 
 from inc_noesis import *
 import rapi
@@ -32,10 +32,10 @@ def check_type(data):
 
 
 def list_to_bytes(data_list, fmt):
-    buffer = b''
+    ar = array.array(fmt, [])
     for item in data_list:
-        buffer += struct.pack(fmt, *item)
-    return buffer
+        ar.extend(item)
+    return ar.tobytes()
 
 
 def load_model(data, mdl_list):
@@ -95,24 +95,24 @@ def load_model(data, mdl_list):
         rapi.rpgSetName(mesh.name)
         rapi.rpgSetMaterial(mesh.material.name)
 
-        rapi.rpgBindPositionBuffer(list_to_bytes(mesh.vertices, '3f'), noesis.RPGEODATA_FLOAT, 12)
-        rapi.rpgBindNormalBuffer(list_to_bytes(mesh.normals, '3f'), noesis.RPGEODATA_FLOAT, 12)
+        rapi.rpgBindPositionBuffer(list_to_bytes(mesh.vertices, 'f'), noesis.RPGEODATA_FLOAT, 12)
+        rapi.rpgBindNormalBuffer(list_to_bytes(mesh.normals, 'f'), noesis.RPGEODATA_FLOAT, 12)
         # rapi.rpgBindColorBuffer(list_to_bytes(mesh.vertex_colors, '4f'), noesis.RPGEODATA_FLOAT, 16, 4)
         if mesh.bone_ids:
             bone_per_vertex = len(mesh.bone_ids[0])
-            rapi.rpgBindBoneIndexBuffer(list_to_bytes(mesh.bone_ids, '%iI' % bone_per_vertex), noesis.RPGEODATA_INT, 16,
+            rapi.rpgBindBoneIndexBuffer(list_to_bytes(mesh.bone_ids, 'I'), noesis.RPGEODATA_INT, 16,
                                         bone_per_vertex)
-            rapi.rpgBindBoneWeightBuffer(list_to_bytes(mesh.weights, '%if' % bone_per_vertex), noesis.RPGEODATA_FLOAT,
+            rapi.rpgBindBoneWeightBuffer(list_to_bytes(mesh.weights, 'f'), noesis.RPGEODATA_FLOAT,
                                          16, bone_per_vertex)
 
         for uv_layer_id, uv_data in mesh.uv_layers.items():
             if uv_layer_id == 0:
-                rapi.rpgBindUV1Buffer(list_to_bytes(uv_data, '2f'), noesis.RPGEODATA_FLOAT, 8)
+                rapi.rpgBindUV1Buffer(list_to_bytes(uv_data, 'f'), noesis.RPGEODATA_FLOAT, 8)
             else:
-                rapi.rpgBindUVXBuffer(list_to_bytes(uv_data, '2f'), noesis.RPGEODATA_FLOAT, 8, uv_layer_id,
+                rapi.rpgBindUVXBuffer(list_to_bytes(uv_data, 'f'), noesis.RPGEODATA_FLOAT, 8, uv_layer_id,
                                       len(uv_data) * 2)
 
-        rapi.rpgCommitTriangles(list_to_bytes(mesh.indices, '3I'), noesis.RPGEODATA_INT, len(mesh.indices) * 3,
+        rapi.rpgCommitTriangles(list_to_bytes(mesh.indices, 'I'), noesis.RPGEODATA_INT, len(mesh.indices) * 3,
                                 noesis.RPGEO_TRIANGLE, 1)
 
         rapi.rpgClearBufferBinds()
