@@ -113,10 +113,13 @@ def load_model(data, mdl_list):
     noe_meshes = []
     for mesh in model.meshes:
         print('Loading %s mesh...' % mesh.name)
-
+        if mesh.material:
+            name = mesh.material.name
+        else:
+            name = mesh.name
         noe_mesh = NoeMesh(flatten(flip_sub_elements(mesh.indices)), list_to_type(mesh.vertices, NoeVec3),
-                           mesh.material.name)
-        noe_mesh.setMaterial(mesh.material.name)
+                           name)
+        noe_mesh.setMaterial(name)
         noe_mesh.setNormals(list_to_type(mesh.normals, NoeVec3))
         noe_mesh.setColors(list_to_type(mesh.vertex_colors, NoeVec4))
         for uv_layer_id, uv_data in mesh.uv_layers.items():
