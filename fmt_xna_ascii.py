@@ -78,37 +78,38 @@ def load_model(data, mdl_list):
     textures.append(specular_texture)
     for mesh in model.meshes:
         material = mesh.material
-        mat_name = material.name
-        if mat_name in materials:
-            continue
-        noe_mat = NoeMaterial(mat_name, '')
-        noe_mat.flags |= noesis.NMATFLAG_PBR_SPEC
-        noe_mat.setFlags2(noe_mat.flags2 | noesis.NMATFLAG2_PREFERPPL)
-        noe_mat.setFlags2(noe_mat.flags2 | noesis.NMATFLAG2_VCOLORMATDIFFUSE)
-        noe_mat.setRoughness(0.5, -0.3)
-        noe_mat.setSpecularTexture('default_spec')
-        noe_mat.setNormalTexture(noesis.getScenesPath() + "sample_pbr_n.png")
-        noe_mat.setEnvTexture(noesis.getScenesPath() + "sample_pbr_e4.dds")
-        has_diffuse = False
-        for i, texture in enumerate(material.textures):
-            texture_name = os.path.splitext(texture[0])[0]
-            noe_tex = rapi.loadExternalTex(texture_name)
-            if noe_tex is None:
+        if material:
+            mat_name = material.name
+            if mat_name in materials:
                 continue
-            if i == 0:
-                has_diffuse = True
-                print("Diffuse ", texture_name)
-                noe_mat.setTexture(texture_name)
-            elif i == 1:
-                print("Normal ", texture_name)
-                noe_mat.setNormalTexture(texture_name)
-            elif i == 2:
-                print("Spec ", texture_name)
-                noe_mat.setSpecularTexture(texture_name)
-            textures.append(noe_tex)
-        if not has_diffuse:
-            noe_mat.setDiffuseColor([random.uniform(.4, 1) for _ in range(3)] + [1.0])
-        materials[mat_name] = noe_mat
+            noe_mat = NoeMaterial(mat_name, '')
+            noe_mat.flags |= noesis.NMATFLAG_PBR_SPEC
+            noe_mat.setFlags2(noe_mat.flags2 | noesis.NMATFLAG2_PREFERPPL)
+            noe_mat.setFlags2(noe_mat.flags2 | noesis.NMATFLAG2_VCOLORMATDIFFUSE)
+            noe_mat.setRoughness(0.5, -0.3)
+            noe_mat.setSpecularTexture('default_spec')
+            noe_mat.setNormalTexture(noesis.getScenesPath() + "sample_pbr_n.png")
+            noe_mat.setEnvTexture(noesis.getScenesPath() + "sample_pbr_e4.dds")
+            has_diffuse = False
+            for i, texture in enumerate(material.textures):
+                texture_name = os.path.splitext(texture[0])[0]
+                noe_tex = rapi.loadExternalTex(texture_name)
+                if noe_tex is None:
+                    continue
+                if i == 0:
+                    has_diffuse = True
+                    print("Diffuse ", texture_name)
+                    noe_mat.setTexture(texture_name)
+                elif i == 1:
+                    print("Normal ", texture_name)
+                    noe_mat.setNormalTexture(texture_name)
+                elif i == 2:
+                    print("Spec ", texture_name)
+                    noe_mat.setSpecularTexture(texture_name)
+                textures.append(noe_tex)
+            if not has_diffuse:
+                noe_mat.setDiffuseColor([random.uniform(.4, 1) for _ in range(3)] + [1.0])
+            materials[mat_name] = noe_mat
     noe_meshes = []
     for mesh in model.meshes:
         print('Loading %s mesh...' % mesh.name)
