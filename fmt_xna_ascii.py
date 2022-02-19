@@ -141,7 +141,9 @@ def load_model(data, mdl_list):
         else:
             noe_mat = NoeMat43()
         noe_mat[3] = NoeVec3(bone.pos)
-        noe_bone = NoeBone(bone_id, bone.name, noe_mat, model_bones[bone.parent_id].name, bone.parent_id)
+
+        noe_bone = NoeBone(bone_id, bone.name, noe_mat,
+                           model_bones[bone.parent_id].name if bone.parent_id != -1 else None)
         bones.append(noe_bone)
     mdl = NoeModel(noe_meshes, bones)
     mdl.setModelMaterials(NoeModelMaterials(textures, list(materials.values())))
