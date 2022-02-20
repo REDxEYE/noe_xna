@@ -100,9 +100,9 @@ def load_model(data, mdl_list):
                 texture, _ = amat_material.textures['Diffuse']
                 print('Setting Diffuse texture to %s' % texture)
                 noe_mat.setTexture(texture)
-                load_texture(original_file_path, texture, textures)
-            else:
-                noe_mat.setDiffuseColor([random.uniform(.4, 1) for _ in range(3)] + [1.0])
+                if load_texture(original_file_path, texture, textures) is None:
+                    noe_mat.setDiffuseColor([random.uniform(.4, 1) for _ in range(3)] + [1.0])
+
             if 'Normal' in amat_material.textures:
                 texture, _ = amat_material.textures['Normal']
                 print('Setting Normal texture to %s' % texture)
