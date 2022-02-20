@@ -1,17 +1,14 @@
 import random
-import struct
-import array
 import time
-
 from inc_noesis import *
 import rapi
 import noesis
 
 noesis.logPopup()
+from py_xna_lib import parse_ascii_mesh, parse_ascii_mesh_from_file, parse_ascii_material_from_file
 
-from py_xna_lib import parse_ascii_mesh, parse_ascii_mesh_from_file
 
-
+# noinspection PyPep8Naming
 def registerNoesisTypes():
     handle = noesis.register("XNA ascii mesh", ".ascii")
     noesis.setHandlerTypeCheck(handle, check_type)
@@ -56,69 +53,73 @@ def fill_up_to(data_list, elen, filler=1.0):
     return data_list
 
 
+def get_neighbor_file(old_path, new_name):
+    root = os.path.dirname(old_path)
+    return os.path.join(root, new_name)
+
+
 def load_model(data, mdl_list):
     start_time = time.time()
     data = [line.strip('\n\r') for line in data.decode('utf-8').split('\n') if line]
-    fpath = rapi.getInputName()
-    fname, root = os.path.basename(fpath), os.path.dirname(fpath)
-    skel_path = os.path.join(root, fname[:-6] + '_skel.ascii')
+    original_file_path = rapi.getInputName()
+    file_name, root = os.path.basename(original_file_path), os.path.dirname(original_file_path)
+    skel_path = os.path.join(root, file_name[:-6] + '_skel.ascii')
     if os.path.exists(skel_path):
-        extenal_skeleton = parse_ascii_mesh_from_file(skel_path)
+        external_skeleton = parse_ascii_mesh_from_file(skel_path)
     else:
-        extenal_skeleton = None
+        external_skeleton = None
     if len(data) < 10:
         print('File is too short')
         return 0
     ctx = rapi.rpgCreateContext()
-    model = parse_ascii_mesh(data, extenal_skeleton is not None)
+    model = parse_ascii_mesh(data, external_skeleton is not None)
 
     materials = {}
-    textures = []
-    specular_texture = NoeTexture('default_spec', 1, 1, b'\x80\x80\x80\x80')
-    textures.append(specular_texture)
+    textures = {}
     for mesh in model.meshes:
         material = mesh.material
         if material:
             mat_name = material.name
             if mat_name in materials:
                 continue
+            print('Loading material %s' % mat_name)
             noe_mat = NoeMaterial(mat_name, '')
-            noe_mat.flags |= noesis.NMATFLAG_PBR_SPEC
             noe_mat.setFlags2(noe_mat.flags2 | noesis.NMATFLAG2_PREFERPPL)
             noe_mat.setFlags2(noe_mat.flags2 | noesis.NMATFLAG2_VCOLORMATDIFFUSE)
             noe_mat.setRoughness(0.5, -0.3)
-            noe_mat.setSpecularTexture('default_spec')
-            noe_mat.setNormalTexture(noesis.getScenesPath() + "sample_pbr_n.png")
-            noe_mat.setEnvTexture(noesis.getScenesPath() + "sample_pbr_e4.dds")
-            has_diffuse = False
-            for i, texture in enumerate(material.textures):
-                texture_name = os.path.splitext(texture[0])[0]
-                noe_tex = rapi.loadExternalTex(texture_name)
-                if noe_tex is None:
-                    continue
-                if i == 0:
-                    has_diffuse = True
-                    print("Diffuse ", texture_name)
-                    noe_mat.setTexture(texture_name)
-                elif i == 1:
-                    print("Normal ", texture_name)
-                    noe_mat.setNormalTexture(texture_name)
-                elif i == 2:
-                    print("Spec ", texture_name)
-                    noe_mat.setSpecularTexture(texture_name)
-                textures.append(noe_tex)
-            if not has_diffuse:
+
+            amat_path = get_neighbor_file(original_file_path, mat_name + '.amat')
+            if os.path.exists(amat_path):
+                print('Using AMAT "%s"' % amat_path)
+                amat_material = parse_ascii_material_from_file(amat_path)
+            else:
+                print('Using built-in material')
+                amat_material = mesh.material
+
+            if 'Diffuse' in amat_material.textures:
+                texture, _ = amat_material.textures['Diffuse']
+                print('Setting Diffuse texture to %s' % texture)
+                noe_mat.setTexture(texture)
+                load_texture(original_file_path, texture, textures)
+            else:
                 noe_mat.setDiffuseColor([random.uniform(.4, 1) for _ in range(3)] + [1.0])
+            if 'Normal' in amat_material.textures:
+                texture, _ = amat_material.textures['Normal']
+                print('Setting Normal texture to %s' % texture)
+                noe_mat.setNormalTexture(texture)
+                load_texture(original_file_path, texture, textures)
+            if 'Specular' in amat_material.textures:
+                texture, _ = amat_material.textures['Specular']
+                print('Setting Specular texture to %s' % texture)
+                noe_mat.setSpecularTexture(texture)
+                load_texture(original_file_path, texture, textures)
+
             materials[mat_name] = noe_mat
     noe_meshes = []
     for mesh in model.meshes:
         print('Loading %s mesh...' % mesh.name)
-        if mesh.material:
-            name = mesh.material.name
-        else:
-            name = mesh.name
-        noe_mesh = NoeMesh(flatten(flip_sub_elements(mesh.indices)), list_to_type(mesh.vertices, NoeVec3),
-                           name)
+        name = mesh.name
+        noe_mesh = NoeMesh(flatten(flip_sub_elements(mesh.indices)), list_to_type(mesh.vertices, NoeVec3), name)
         noe_mesh.setMaterial(name)
         noe_mesh.setNormals(list_to_type(mesh.normals, NoeVec3))
         noe_mesh.setColors(list_to_type(mesh.vertex_colors, NoeVec4))
@@ -131,8 +132,8 @@ def load_model(data, mdl_list):
         noe_meshes.append(noe_mesh)
 
     bones = []
-    if extenal_skeleton is not None:
-        model_bones = extenal_skeleton.bones
+    if external_skeleton is not None:
+        model_bones = external_skeleton.bones
     else:
         model_bones = model.bones
     for bone_id, bone in enumerate(model_bones):
@@ -146,8 +147,20 @@ def load_model(data, mdl_list):
                            model_bones[bone.parent_id].name if bone.parent_id != -1 else None)
         bones.append(noe_bone)
     mdl = NoeModel(noe_meshes, bones)
-    mdl.setModelMaterials(NoeModelMaterials(textures, list(materials.values())))
+    mdl.setModelMaterials(NoeModelMaterials(list(textures.values()), list(materials.values())))
 
     mdl_list.append(mdl)
     print("Import took %.2f seconds" % (time.time() - start_time))
     return 1
+
+
+def load_texture(original_file_path, texture, textures):
+    if texture in textures:
+        return textures[texture]
+    full_texture_path = get_neighbor_file(original_file_path, texture)
+    print('Loading texture from %s' % full_texture_path)
+    noe_texture = rapi.loadExternalTex(full_texture_path)
+    if noe_texture is None:
+        return None
+    noe_texture.name = texture
+    textures[noe_texture.name] = noe_texture
