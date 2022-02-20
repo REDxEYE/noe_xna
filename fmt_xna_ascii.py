@@ -115,6 +115,12 @@ def load_model(data, mdl_list):
                 load_texture(original_file_path, texture, textures)
 
             materials[mat_name] = noe_mat
+        else:
+            if mesh.name in materials:
+                continue
+            noe_mat = NoeMaterial(mesh.name, '')
+            noe_mat.setDiffuseColor([random.uniform(.4, 1) for _ in range(3)] + [1.0])
+            materials[mesh.name] = noe_mat
     noe_meshes = []
     for mesh in model.meshes:
         print('Loading %s mesh...' % mesh.name)
