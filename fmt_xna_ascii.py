@@ -143,6 +143,8 @@ def load_model(data, mdl_list):
     else:
         model_bones = model.bones
     for bone_id, bone in enumerate(model_bones):
+        if 'unused' in bone.name:
+            continue
         if bone.quat:
             noe_mat = NoeQuat(bone.quat).toMat43(1)
         else:
@@ -170,3 +172,4 @@ def load_texture(original_file_path, texture, textures):
         return None
     noe_texture.name = texture
     textures[noe_texture.name] = noe_texture
+    return noe_texture
