@@ -85,7 +85,6 @@ def load_model(data, mdl_list):
     if len(data) < 10:
         print('File is too short')
         return 0
-    ctx = rapi.rpgCreateContext()
     model = parse_ascii_mesh(data, external_bones is not None)
 
     materials = {}
@@ -151,18 +150,19 @@ def load_model(data, mdl_list):
             noe_mesh.setWeights(weights)
         noe_meshes.append(noe_mesh)
 
-    bones = []
     if external_bones is not None:
         model_bones = external_bones
     else:
         model_bones = model.bones
+
+    bones = []
     for bone_id, bone in enumerate(model_bones):
         bone_name = bone.name
         if remap_table is not None:
             bone_name = remap_table.get(bone_name, bone_name)
-
         if 'unused' in bone_name:
             continue
+
         if bone.quat:
             noe_mat = NoeQuat(bone.quat).toMat43(1)
         else:
@@ -174,8 +174,8 @@ def load_model(data, mdl_list):
         bones.append(noe_bone)
     mdl = NoeModel(noe_meshes, bones)
     mdl.setModelMaterials(NoeModelMaterials(list(textures.values()), list(materials.values())))
-
     mdl_list.append(mdl)
+
     print("Import took %.2f seconds" % (time.time() - start_time))
     return 1
 
