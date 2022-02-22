@@ -197,6 +197,7 @@ def load_texture(original_file_path, texture, textures):
     noe_texture = rapi.loadExternalTex(full_texture_path)
     if noe_texture is None:
         full_texture_path = get_neighbor_file(os.path.join(original_file_path, 'textures'), texture)
+        print('Loading texture from %s' % full_texture_path)
         noe_texture = rapi.loadExternalTex(full_texture_path)
         if noe_texture is None:
             return None
