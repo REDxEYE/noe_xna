@@ -86,6 +86,13 @@ def load_model(data, mdl_list):
         print('File is too short')
         return 0
     model = parse_ascii_mesh(data, external_bones is not None)
+    print('Statistic for "%s" file:' % original_file_path)
+    for mesh in model.meshes:
+        print('  Mesh "%s":' % mesh.name)
+        print('    Triangles: %i' % len(mesh.indices))
+        print('    Vertices: %i' % len(mesh.vertices))
+        print('    UV layers: %i' % len(mesh.uv_layers))
+        print('    Weights: %s' % str(len(mesh.weights) > 0))
 
     materials = {}
     textures = {}
