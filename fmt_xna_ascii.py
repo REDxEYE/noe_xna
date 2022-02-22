@@ -162,11 +162,13 @@ def load_model(data, mdl_list):
     else:
         model_bones = model.bones
 
+    for bone in model_bones:
+        if remap_table is not None:
+            bone.name = remap_table.get(bone.name, bone.name)
+
     bones = []
     for bone_id, bone in enumerate(model_bones):
         bone_name = bone.name
-        if remap_table is not None:
-            bone_name = remap_table.get(bone_name, bone_name)
         if 'unused' in bone_name:
             continue
 
