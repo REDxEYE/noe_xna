@@ -5,7 +5,8 @@ import rapi
 import noesis
 
 noesis.logPopup()
-from py_xna_lib import parse_ascii_mesh, parse_ascii_mesh_from_file, parse_ascii_material_from_file
+from py_xna_lib import parse_ascii_mesh, parse_ascii_mesh_from_file, parse_ascii_material_from_file, parse_bone_names, \
+    parse_bone_names_from_file
 
 
 # noinspection PyPep8Naming
@@ -62,17 +63,30 @@ def load_model(data, mdl_list):
     start_time = time.time()
     data = [line.strip('\n\r') for line in data.decode('utf-8').split('\n') if line]
     original_file_path = rapi.getInputName()
-    file_name, root = os.path.basename(original_file_path), os.path.dirname(original_file_path)
-    skel_path = os.path.join(root, file_name[:-6] + '_skel.ascii')
-    if os.path.exists(skel_path):
-        external_skeleton = parse_ascii_mesh_from_file(skel_path)
+    file_name = os.path.basename(original_file_path)
+
+    bone_remap_file = get_neighbor_file(original_file_path, 'bonenames.txt')
+    ascii_skel_path = get_neighbor_file(original_file_path, file_name[:-6] + '_skel.ascii')
+    # smd_skel_path = get_neighbor_file(original_file_path, file_name[:-6] + '_skel.smd')
+    if os.path.exists(bone_remap_file):
+        print('Using bone names remap file "%s"' % bone_remap_file)
+        remap_table = parse_bone_names_from_file(bone_remap_file)
     else:
-        external_skeleton = None
+        remap_table = None
+    if os.path.exists(ascii_skel_path):
+        print('Using external ASCII skeleton "%s"' % ascii_skel_path)
+        external_skeleton = parse_ascii_mesh_from_file(ascii_skel_path)
+        external_bones = external_skeleton.bones
+    # elif os.path.exists(smd_skel_path):
+    #     print('Using external SMD skeleton "%s"' % smd_skel_path)
+    #     external_bones = parse_smd_bones_from_file(smd_skel_path)
+    else:
+        external_bones = None
     if len(data) < 10:
         print('File is too short')
         return 0
     ctx = rapi.rpgCreateContext()
-    model = parse_ascii_mesh(data, external_skeleton is not None)
+    model = parse_ascii_mesh(data, external_bones is not None)
 
     materials = {}
     textures = {}
@@ -138,12 +152,16 @@ def load_model(data, mdl_list):
         noe_meshes.append(noe_mesh)
 
     bones = []
-    if external_skeleton is not None:
-        model_bones = external_skeleton.bones
+    if external_bones is not None:
+        model_bones = external_bones
     else:
         model_bones = model.bones
     for bone_id, bone in enumerate(model_bones):
-        if 'unused' in bone.name:
+        bone_name = bone.name
+        if remap_table is not None:
+            bone_name = remap_table.get(bone_name, bone_name)
+
+        if 'unused' in bone_name:
             continue
         if bone.quat:
             noe_mat = NoeQuat(bone.quat).toMat43(1)
@@ -151,7 +169,7 @@ def load_model(data, mdl_list):
             noe_mat = NoeMat43()
         noe_mat[3] = NoeVec3(bone.pos)
 
-        noe_bone = NoeBone(bone_id, bone.name, noe_mat,
+        noe_bone = NoeBone(bone_id, bone_name, noe_mat,
                            model_bones[bone.parent_id].name if bone.parent_id != -1 else None)
         bones.append(noe_bone)
     mdl = NoeModel(noe_meshes, bones)
