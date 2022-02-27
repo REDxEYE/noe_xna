@@ -1,3 +1,4 @@
+import os.path
 import random
 import time
 from inc_noesis import *
@@ -189,6 +190,13 @@ def load_model(data, mdl_list):
     return 1
 
 
+def try_find_texture(root_path: str, texture_name):
+    for file in os.listdir(root_path):
+        name, ext = file.rsplit('.', 1)
+        if ext in ('png', 'tga', 'dds', 'jpg', 'jpeg', 'bmp') and name == texture_name:
+            return os.path.join(root_path, file)
+
+
 def load_texture(original_file_path, texture, textures):
     if texture in textures:
         return textures[texture]
@@ -196,9 +204,11 @@ def load_texture(original_file_path, texture, textures):
     print('Loading texture from %s' % full_texture_path)
     noe_texture = rapi.loadExternalTex(full_texture_path)
     if noe_texture is None:
-        full_texture_path = get_neighbor_file(os.path.join(original_file_path, 'textures'), texture)
+        full_texture_path = try_find_texture(os.path.join(os.path.dirname(original_file_path), 'textures'), texture)
+        if full_texture_path is None:
+            return
         print('Loading texture from %s' % full_texture_path)
-        noe_texture = rapi.loadExternalTex(full_texture_path)
+        noe_texture = noesis.loadImageRGBA(full_texture_path)
         if noe_texture is None:
             return None
 
